@@ -1,0 +1,5 @@
+# dsh-plugin-memo：侧栏「备忘」面板（待办 / 备忘 sheet）+ 宿主端 JSON 存储。
+# 数据文件沿用 $DSH_HOME/plugin-data/notes-todo/data.json，升级不丢旧数据。
+- insert:
+    - id: memo
+      name: dsh-plugin-memo

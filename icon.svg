@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="64" height="64" role="img" aria-label="Notes &amp; Todos">
+  <rect x="4" y="2.5" width="24" height="27" rx="5" fill="#4B6BFB"/>
+  <path d="M10 10.5h12M10 15.5h12" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M10 20.8l2.1 2.1 4.6-5.2" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

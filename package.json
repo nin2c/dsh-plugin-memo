@@ -1,0 +1,62 @@
+{
+  "name": "dsh-plugin-memo",
+  "version": "0.2.4",
+  "description": "Lightweight notes & todo panel for the DeepSeek Harness (DSH) Web UI: work/personal todo columns, five autosaving memo windows, drag-to-reorder, inline editing, and local JSON storage.",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale",
+    "icon.svg",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "dsh-plugin",
+    "dsh",
+    "deepseek-harness",
+    "deepseek",
+    "plugin",
+    "notes",
+    "todo",
+    "memo",
+    "productivity",
+    "local-first"
+  ],
+  "author": "nin2c",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nin2c/dsh-plugin-memo.git"
+  },
+  "homepage": "https://github.com/nin2c/dsh-plugin-memo#readme",
+  "bugs": {
+    "url": "https://github.com/nin2c/dsh-plugin-memo/issues"
+  },
+  "scripts": {
+    "check": "node --check index.js && node --check client.js"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ]
+    }
+  }
+}
