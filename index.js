@@ -37,7 +37,7 @@ export const name = 'memo'
 export const inject = ['webServer']
 
 const BASE = '/notes-todo'
-const VERSION = '0.2.4'
+const VERSION = '0.3.0'
 const MAX_BODY = 256 * 1024
 const MAX_TEXT = 2000
 const MAX_MEMO = 20000

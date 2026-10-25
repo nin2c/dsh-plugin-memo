@@ -1,6 +1,6 @@
 {
   "name": "dsh-plugin-memo",
-  "version": "0.2.4",
+  "version": "0.3.0",
   "description": "Lightweight notes & todo panel for the DeepSeek Harness (DSH) Web UI: work/personal todo columns, five autosaving memo windows, drag-to-reorder, inline editing, and local JSON storage.",
   "type": "module",
   "main": "index.js",

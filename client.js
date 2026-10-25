@@ -29,6 +29,9 @@ window.__ModuleLoader__.load({
     const MAX_MEMO = 20000
     const MEMO_SLOTS = ['topLeft', 'topRight', 'bottomLeft', 'bottomRight', 'main']
     const AUTOSAVE_DELAY = 600
+    const RIGHT_TAB_ID = 'dsh-plugin-memo:main'
+    const RIGHT_TAB_KIND = 'memo:main'
+    const MEMO_SYNC_EVENT = 'dsh-plugin-memo:sync'
 
     const DICTS = {
       en: {
@@ -59,6 +62,9 @@ window.__ModuleLoader__.load({
         memo3: 'Note 3…',
         memo4: 'Note 4…',
         memoMain: 'Main notes…',
+        sideTitle: 'Main memo',
+        sideGuide: 'Memo',
+        sideGuideDesc: 'Write the main memo while chatting',
         loading: 'Loading…',
         refresh: 'Refresh',
         errorPrefix: 'Something went wrong:',
@@ -93,6 +99,9 @@ window.__ModuleLoader__.load({
         memo3: '记录 3…',
         memo4: '记录 4…',
         memoMain: '主要备忘…',
+        sideTitle: '主要备忘',
+        sideGuide: '备忘',
+        sideGuideDesc: '边聊天边记大备忘',
         loading: '读取中…',
         refresh: '刷新',
         errorPrefix: '出错了：',
@@ -242,6 +251,12 @@ window.__ModuleLoader__.load({
 .dnt-memo{box-sizing:border-box;width:100%;height:100%;min-height:0;margin:0;padding:10px 12px;border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font-family:inherit;font-size:13px;line-height:1.7;resize:none;outline:none}
 .dnt-btn:focus-visible,.dnt-icon-btn:focus-visible,.dnt-tab:focus-visible,.dnt-check:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}
 @media (max-width:860px){.dnt-board{grid-template-columns:1fr;overflow:auto}.dnt-col{min-height:360px}.dnt-memo-grid{grid-template-columns:1fr;overflow:auto}.dnt-memo{min-height:140px}}
+.dnt-side{height:100%;display:flex;flex-direction:column;gap:8px;box-sizing:border-box;padding:10px 12px;background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary)}
+.dnt-side-head{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.dnt-side-title{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600}
+.dnt-side-sub{font-size:11px;color:var(--dsw-alias-label-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dnt-side-area{flex:1 1 auto;min-height:120px;width:100%;box-sizing:border-box;resize:none;margin:0;padding:10px 12px;border:1px solid var(--dsw-alias-border-l1);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font-family:inherit;font-size:13px;line-height:1.7;outline:none}
+.dnt-side-error{margin:0;color:var(--dsw-alias-state-error-primary);font-size:11px;word-break:break-word}
 `
 
     /* ---------------- data ---------------- */
@@ -261,12 +276,32 @@ window.__ModuleLoader__.load({
       const latestMemos = React.useRef(state.memos)
       const editedMemos = React.useRef(false)
       const mounted = React.useRef(true)
+      const instanceId = React.useRef(`memo-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`)
 
       React.useEffect(() => {
         mounted.current = true
         return () => {
           mounted.current = false
         }
+      }, [])
+
+      // The same memo slot can be edited in two mounted surfaces (the Memo panel
+      // and the right-sidebar tab). Keystrokes in one mirror into the other; only
+      // the surface that owns the edit runs the debounced save.
+      React.useEffect(() => {
+        const receive = (event) => {
+          const detail = event && event.detail
+          if (!detail || detail.source === instanceId.current) return
+          if (typeof detail.slot !== 'string' || typeof detail.text !== 'string') return
+          if (MEMO_SLOTS.indexOf(detail.slot) < 0) return
+          if (latestMemos.current[detail.slot] === detail.text) return
+          editedMemos.current = true
+          latestMemos.current = { ...latestMemos.current, [detail.slot]: detail.text }
+          setState((prev) => ({ ...prev, memos: { ...prev.memos, [detail.slot]: detail.text } }))
+          setMemoStatus((prev) => ({ ...prev, [detail.slot]: 'saved' }))
+        }
+        window.addEventListener(MEMO_SYNC_EVENT, receive)
+        return () => window.removeEventListener(MEMO_SYNC_EVENT, receive)
       }, [])
 
       const load = React.useCallback(() => {
@@ -367,6 +402,15 @@ window.__ModuleLoader__.load({
             timers.current[slot] = null
             saveMemo(slot)
           }, AUTOSAVE_DELAY)
+          try {
+            window.dispatchEvent(
+              new CustomEvent(MEMO_SYNC_EVENT, {
+                detail: { source: instanceId.current, slot, text },
+              }),
+            )
+          } catch {
+            /* cross-surface sync is best effort */
+          }
         },
         [saveMemo],
       )
@@ -757,6 +801,14 @@ window.__ModuleLoader__.load({
       )
     }
 
+    function memoStatusLabel(t, store) {
+      const states = MEMO_SLOTS.map((slot) => store.memoStatus[slot])
+      if (states.indexOf('error') >= 0) return t('saveFailed')
+      if (states.indexOf('saving') >= 0) return t('saving')
+      if (store.lastSavedAt) return fmt(t('savedAt'), { time: formatClock(store.lastSavedAt) })
+      return t('autosaveHint')
+    }
+
     function MemoBoard(props) {
       const { t, memos, onChange, onFlush } = props
       const area = (slot, placeholder, extraClass) =>
@@ -782,6 +834,44 @@ window.__ModuleLoader__.load({
           area('bottomRight', t('memo4')),
         ),
         area('main', t('memoMain'), 'dnt-memo-main'),
+      )
+    }
+
+    /**
+     * Right-sidebar tab body: the big "main" memo window, so a memo can be
+     * written while the conversation fills the center column. It shares the
+     * Host store with the panel; edits mirror across mounted surfaces through
+     * MEMO_SYNC_EVENT and autosave exactly like the panel editor.
+     */
+    function MemoSidebarBody(props) {
+      const t = props.t
+      useLocaleRevision(props.locale)
+      const store = useStore()
+      const status = memoStatusLabel(t, store)
+
+      return h(
+        'div',
+        { className: 'dnt-side' },
+        h('style', { key: 'style' }, CSS),
+        h(
+          'div',
+          { className: 'dnt-side-head' },
+          h('span', { className: 'dnt-side-title' }, t('sideTitle')),
+          h('span', { className: 'dnt-side-sub', title: status }, status),
+        ),
+        h('textarea', {
+          className: 'dnt-side-area',
+          value: store.memos.main,
+          placeholder: t('memoMain'),
+          'aria-label': t('sideTitle'),
+          maxLength: MAX_MEMO,
+          spellCheck: false,
+          onChange: (event) => store.updateMemo('main', event.target.value),
+          onBlur: () => store.flushMemo('main'),
+        }),
+        store.error
+          ? h('p', { className: 'dnt-side-error' }, `${t('errorPrefix')} ${store.error}`)
+          : null,
       )
     }
 
@@ -848,16 +938,7 @@ window.__ModuleLoader__.load({
         setView(next)
       }
 
-      const memoStates = MEMO_SLOTS.map((slot) => store.memoStatus[slot])
-      const memoSaving = memoStates.indexOf('saving') >= 0
-      const memoError = memoStates.indexOf('error') >= 0
-      const memoSubtitle = memoError
-        ? t('saveFailed')
-        : memoSaving
-          ? t('saving')
-          : store.lastSavedAt
-            ? fmt(t('savedAt'), { time: formatClock(store.lastSavedAt) })
-            : t('autosaveHint')
+      const memoSubtitle = memoStatusLabel(t, store)
 
       const subtitle =
         store.status === 'loading'
@@ -1002,6 +1083,44 @@ window.__ModuleLoader__.load({
             ),
           ),
         )
+
+        // Right sidebar: the big "main" memo window as its own tab type, so a
+        // memo can be written beside the conversation. The guide card is the
+        // entry point; once opened, the per-session layout remembers the tab.
+        ctx.inject(['sidebarRightTabs'], (sidebarCtx) => {
+          const sidebarTabs = sidebarCtx.get('sidebarRightTabs')
+          if (!sidebarTabs || typeof sidebarTabs.register !== 'function') return
+          sidebarCtx.effect(() =>
+            sidebarTabs.register({
+              id: RIGHT_TAB_ID,
+              kind: RIGHT_TAB_KIND,
+              priority: 'extension',
+              keepMounted: true,
+              title: () => t('sideGuide'),
+              guide: [
+                {
+                  id: 'main',
+                  order: 60,
+                  title: () => t('sideGuide'),
+                  description: t('sideGuideDesc'),
+                  icon: MemoIcon,
+                },
+              ],
+            }),
+          )
+          sidebarCtx.effect(() =>
+            sidebarCtx.slots.inject('sidebar.right.pane.tab', () =>
+              sidebarCtx.slots.register(
+                {
+                  name: 'sidebar.right.pane.tab',
+                  key: RIGHT_TAB_ID,
+                  inject: () => ({ t, locale }),
+                },
+                MemoSidebarBody,
+              ),
+            ),
+          )
+        })
       },
     }
   },
